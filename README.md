@@ -46,7 +46,7 @@ recovered = engine.desencriptar(encrypted)
 ```
 
 ---
-![Cipher Engine Analysis](NONIV1/analysis.png)
+![Cipher Engine Analysis](NONIV1/Analysis.png)
 
 ---
 ## Related Research
