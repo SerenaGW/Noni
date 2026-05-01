@@ -10,23 +10,31 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 class CryptoManifold:
+    """
+    Handles the 256-bit state generation and spatial projection 
+    logic for the Noni Engine analysis.
+    """
+
     def __init__(self, master_value):
         self.master_value = master_value
 
     def project_position(self, i, lattice_digit, iv_seed):
+        # 256-bit State generation (32 bytes)
         seed = f"{self.master_value}-pos-{i}-lat-{lattice_digit}-iv-{iv_seed}"
-        digest = hashlib.sha256(seed.encode()).digest()
+        state_256 = hashlib.sha256(seed.encode()).digest()
 
-        # Rule selection (v_man)
-        v_final = int.from_bytes(digest[:2], 'big') % 1024
+        # Extract first 64 bits for entropy fingerprint visualization
+        bits = np.unpackbits(np.frombuffer(state_256, dtype=np.uint8))
 
-        # Aesthetic coordinates for 3D plotting
-        phase = (self.master_value % 100) + i + lattice_digit + iv_seed
-        x = math.sin(phase * 0.5) * (digest[0]/255)
-        y = math.cos(phase * 0.3) * (digest[1]/255)
-        z = math.sin(phase * 1.6) * (digest[2]/255)
+        # 3D Coordinate projection based on real manifold bytes
+        x = state_256[0] / 255.0
+        y = state_256[1] / 255.0
+        z = state_256[2] / 255.0
 
-        return v_final, x, y, z
+        # Energy density calculation via Hamming Weight
+        intensity = bin(int.from_bytes(state_256, 'big')).count('1')
+
+        return bits[:64], x, y, z, intensity
 
     def is_noise_position(self, i):
         if i == 0:
@@ -37,32 +45,32 @@ class CryptoManifold:
 
 
 class CryptoVisualizer:
+    """
+    Orchestrates the PRNG initialization and visualization metadata.
+    """
+
     def __init__(self, master_key="girasol"):
         self.salt = secrets.token_bytes(16)
-
-        # Standard KDF derivation
         stretched = hashlib.pbkdf2_hmac(
             'sha256', master_key.encode(), self.salt, 100000)
 
-        # Deterministic dummy lattice for visualization purposes
-        # This simulates the LatticePRNG behavior
         np.random.seed(int.from_bytes(stretched, 'big') % (2**32))
         self.lattice_mock = np.random.randint(0, 10, 1000)
 
-        key_res = []
-        for i in range(500):
-            key_res.append(chr(65 + (self.lattice_mock[i] % 26)))
-
+        key_res = [chr(65 + (self.lattice_mock[i] % 26)) for i in range(500)]
         hash_bytes = hashlib.sha256("".join(key_res).encode()).digest()
         self.master_value = int.from_bytes(hash_bytes, byteorder='big')
         self.manifold = CryptoManifold(self.master_value)
 
 
-def visualize_cipher_flow(master_key, text):
+def visualize_high_dim_manifold(master_key, text):
+    """
+    Renders the Entropy Fingerprint and 3D Manifold projection plots.
+    """
     viz = CryptoVisualizer(master_key)
     words = text.split()
 
-    data_map = []
+    bit_map = []
     points_3d = []
     axis_labels = []
 
@@ -71,19 +79,20 @@ def visualize_cipher_flow(master_key, text):
 
     while p_idx < len(words) and p_idx < 40:
         if viz.manifold.is_noise_position(f_idx):
-            data_map.append([0.2]*5)
-            points_3d.append([0, 0, 0, 0])
+            bits, x, y, z, intense = viz.manifold.project_position(
+                f_idx, 0, iv)
+            bit_map.append(bits)
+            points_3d.append([x, y, z, intense])
             axis_labels.append(f"[NOISE_{f_idx}]")
             f_idx += 1
             continue
 
         lattice_d = viz.lattice_mock[f_idx % 1000]
-        v_man, x, y, z = viz.manifold.project_position(f_idx, lattice_d, iv)
+        bits, x, y, z, intense = viz.manifold.project_position(
+            f_idx, lattice_d, iv)
 
-        # Rules activation (INV, ROTA, ESP, ALT, SHF)
-        activations = [(v_man >> j) & 1 for j in range(5)]
-        data_map.append(activations)
-        points_3d.append([x, y, z, v_man % 100])
+        bit_map.append(bits)
+        points_3d.append([x, y, z, intense])
 
         label = re.sub(r'[^a-zA-Z]', '', words[p_idx])
         axis_labels.append(f"{label}_{p_idx}")
@@ -91,41 +100,49 @@ def visualize_cipher_flow(master_key, text):
         p_idx += 1
         f_idx += 1
 
-    # --- RENDER ---
+    # --- RENDER ENGINE ---
     sns.set_theme(style="white")
-    fig = plt.figure(figsize=(18, 9))
+    fig = plt.figure(figsize=(20, 10))
 
-    # 1. ATTENTION MAP (Heatmap)
+    # 1. ENTROPY FINGERPRINT (Heatmap)
     ax1 = fig.add_subplot(121)
-    df = pd.DataFrame(data_map, columns=['INV', 'ROTA', 'ESP', 'ALT', 'SHF'])
-    sns.heatmap(df, cmap="rocket", cbar=True, linewidths=.5,
-                yticklabels=axis_labels, ax=ax1)
-    ax1.set_title(
-        "GEOMETRIC ATTENTION MAP\n(Rule Activation per Token)", fontsize=12)
+    df = pd.DataFrame(bit_map)
+    sns.heatmap(df, cmap="mako", cbar=False, yticklabels=axis_labels, ax=ax1)
+    ax1.set_title("ENTROPY FINGERPRINT (Bit-level Logic)", fontsize=14)
+    ax1.set_xlabel("State Bit Index (First 64 bits)")
 
-    # 2. 3D MANIFOLD PROJECTION
+    # 2. 3D MANIFOLD CLOUD (Spatial Projection)
     ax2 = fig.add_subplot(122, projection='3d')
     pts = np.array(points_3d)
 
-    ax2.plot(pts[:, 0], pts[:, 1], pts[:, 2], color='cyan', alpha=0.3, lw=1)
+    # Trajectory path rendering
+    ax2.plot(pts[:, 0], pts[:, 1], pts[:, 2], color='#475569',
+             alpha=0.5, lw=1.5, linestyle='-')
+
+    # Scatter plot with energy density mapping
     scatter = ax2.scatter(pts[:, 0], pts[:, 1], pts[:, 2],
-                          c=pts[:, 3], cmap='plasma', s=100,
-                          edgecolors='black', alpha=0.8)
+                          c=pts[:, 3], cmap='viridis', s=130,
+                          edgecolors='white', linewidth=0.5, alpha=0.95)
 
     cbar = fig.colorbar(scatter, ax=ax2, shrink=0.5, aspect=10)
-    cbar.set_label('Phase Intensity (Energy)')
+    cbar.set_label('Hamming Weight (Energy Density)')
 
-    ax2.set_xlabel('Phase X')
-    ax2.set_ylabel('Phase Y')
-    ax2.set_zlabel('Phase Z')
-    ax2.set_title("MANIFOLD PROJECTION CLOUD", fontsize=12)
+    ax2.set_xlabel('Dim X (Byte 0)')
+    ax2.set_ylabel('Dim Y (Byte 1)')
+    ax2.set_zlabel('Dim Z (Byte 2)')
+    ax2.set_title("3D SHADOW OF THE 256-BIT MANIFOLD", fontsize=14)
 
-    plt.suptitle(
-        f"CIPHER ENGINE V2.1 ANALYSIS - Master Key: {master_key.upper()}", fontsize=14)
+    ax2.xaxis.pane.fill = False
+    ax2.yaxis.pane.fill = False
+    ax2.zaxis.pane.fill = False
+    ax2.grid(True, linestyle=':', alpha=0.4)
+
+    plt.suptitle(f"NONI ENGINE - HIGH-DIMENSIONAL ANALYSIS\nMaster Key: {master_key.upper()}",
+                 fontsize=16, y=0.95)
     plt.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
-    test_phrase = "hello hello hello hello hello hello hello"
-    visualize_cipher_flow("girasol", test_phrase)
+    test_phrase = "hello hello hello hello hello hello hello hello hello hello hello"
+    visualize_high_dim_manifold("girasol", test_phrase)
