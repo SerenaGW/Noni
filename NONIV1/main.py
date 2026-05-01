@@ -3,17 +3,19 @@ import textwrap
 from core.engine import CipherEngine
 
 
-def normalize_for_test(text):
+def normalize_for_test(text, engine):
     """
-    Removes accents for basic synchronization comparison.
+    Standardizes text by removing accents and synchronizing case 
+    for integrity comparison.
     """
-    accents = str.maketrans("áéíóúüÁÉÍÓÚÜ", "aeiouuAEIOUU")
-    return text.translate(accents).split()
+    # Using the engine's internal method for consistency
+    text = engine._strip_accents(text.lower())
+    return text.split()
 
 
 def print_data_block(title, text, width=80):
     """
-    Formats text output into titled blocks for better readability.
+    Formats text output into titled blocks for enhanced readability.
     """
     print(f"\n[{title}]")
     print(textwrap.fill(text, width=width))
@@ -21,37 +23,36 @@ def print_data_block(title, text, width=80):
 
 def run_system_demonstration():
     """
-    Executes a complete encryption/decryption cycle to validate 
-    functional integrity and measure processing latency.
+    Executes a complete end-to-end cycle to validate functional 
+    integrity and measure processing latency.
     """
-    # Placeholder for user-defined input
-    original_text = "Insert your phrase or text here"
+    # Demonstration payload
+    original_text = "The quick brown fox jumps over the lazy dog."
 
+    # Initialize engine with the master key
     engine = CipherEngine(master_key="girasol")
 
     print("="*60)
-    print("CIPHER ENGINE: END-TO-END DEMONSTRATION")
+    print("NONI ENGINE: SYSTEM DEMONSTRATION")
     print("="*60)
 
-    # Measure encryption performance
+    # Performance measurement: Encryption
     start_enc = time.perf_counter()
     encrypted_package = engine.encrypt(original_text)
     end_enc = time.perf_counter()
 
-    # Measure decryption performance
+    # Performance measurement: Decryption
     start_dec = time.perf_counter()
     recovered_text = engine.decrypt(encrypted_package)
     end_dec = time.perf_counter()
 
     print_data_block("ORIGINAL PLAINTEXT", original_text)
-    print_data_block(
-        "ENCRYPTED PAYLOAD (HMAC + SALT + IV + BODY)", encrypted_package)
+    print_data_block("ENCRYPTED PAYLOAD (CIPHERTEXT)", encrypted_package)
     print_data_block("RECOVERED PLAINTEXT", recovered_text)
 
-    # Integrity verification
-    original_normalized = [w.lower()
-                           for w in normalize_for_test(original_text)]
-    recovered_normalized = [w.lower() for w in recovered_text.split()]
+    # Integrity verification via normalized comparison
+    original_normalized = normalize_for_test(original_text, engine)
+    recovered_normalized = recovered_text.lower().split()
 
     latency = end_enc - start_enc
 
@@ -66,7 +67,7 @@ def run_system_demonstration():
     else:
         print("Status: SYNCHRONIZATION ERROR")
         print(
-            f"Mismatch detected. Input: {len(original_normalized)} words | Output: {len(recovered_normalized)} words")
+            f"Input: {len(original_normalized)} words | Output: {len(recovered_normalized)} words")
     print("="*60 + "\n")
 
 
