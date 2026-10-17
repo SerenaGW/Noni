@@ -1,5 +1,7 @@
 # Noni: A Symbolic Infrastructure for Data Encryption
 
+> **Review note (October 2026):** This report reflects my original analysis. Several of its claims, including the security interpretation of the entropy, Hamming and correlation metrics and the statement that no data is lost, turned out to be incorrect. See the "Known limitations" section in the README for the corrected analysis.
+
 Noni is a symmetric stream cipher for natural language text, based on a Lattice-based PRNG and a phonetics-driven dispersion engine.
 
 This project has an unusual origin. As a child, I developed a private symbolic language as a personal creative exercise. Years later, that language became the foundation for research into adversarial techniques in large language models. Noni is the next step in that same line: a practical experiment that formalizes those symbolic patterns into a functional cryptographic infrastructure capable of protecting data through high-entropy, multi-dimensional mappings.
